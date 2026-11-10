@@ -1,0 +1,258 @@
+window.PRESETS_DATA = [
+  {
+    "id": "preset_anime_masterpiece",
+    "name": "二次元顶级杰作",
+    "category": "画质增强",
+    "positive": [
+      {
+        "tag": "masterpiece",
+        "weight": 1,
+        "cn": "杰作"
+      },
+      {
+        "tag": "best quality",
+        "weight": 1,
+        "cn": "最佳质量"
+      },
+      {
+        "tag": "ultra-detailed",
+        "weight": 1.2,
+        "cn": "超级细节"
+      },
+      {
+        "tag": "highres",
+        "weight": 1,
+        "cn": "高分辨率"
+      },
+      {
+        "tag": "absurdres",
+        "weight": 1,
+        "cn": "顶级分辨率"
+      },
+      {
+        "tag": "beautiful detailed eyes",
+        "weight": 1.1,
+        "cn": "精致美丽的眼睛"
+      },
+      {
+        "tag": "extremely detailed anime wallpaper",
+        "weight": 1,
+        "cn": "极其精细的动漫壁纸"
+      }
+    ],
+    "negative": [
+      {
+        "tag": "worst quality",
+        "weight": 1.4,
+        "cn": "最差质量"
+      },
+      {
+        "tag": "low quality",
+        "weight": 1.4,
+        "cn": "低质量"
+      },
+      {
+        "tag": "normal quality",
+        "weight": 1,
+        "cn": "一般质量"
+      },
+      {
+        "tag": "bad anatomy",
+        "weight": 1.2,
+        "cn": "糟糕的人体"
+      },
+      {
+        "tag": "bad hands",
+        "weight": 1.3,
+        "cn": "糟糕的手"
+      },
+      {
+        "tag": "missing fingers",
+        "weight": 1.3,
+        "cn": "缺失手指"
+      },
+      {
+        "tag": "extra digits",
+        "weight": 1.2,
+        "cn": "多余手指"
+      },
+      {
+        "tag": "fewer digits",
+        "weight": 1.2,
+        "cn": "缺少手指"
+      },
+      {
+        "tag": "mutated hands and fingers",
+        "weight": 1.4,
+        "cn": "变异的手指"
+      },
+      {
+        "tag": "watermark",
+        "weight": 1,
+        "cn": "水印"
+      },
+      {
+        "tag": "username",
+        "weight": 1,
+        "cn": "用户名"
+      },
+      {
+        "tag": "blurry",
+        "weight": 1.2,
+        "cn": "模糊"
+      }
+    ]
+  },
+  {
+    "id": "preset_cyberpunk_girl",
+    "name": "赛博朋克霓虹少女",
+    "category": "风格模板",
+    "positive": [
+      {
+        "tag": "1girl",
+        "weight": 1,
+        "cn": "1女孩"
+      },
+      {
+        "tag": "solo",
+        "weight": 1,
+        "cn": "单人"
+      },
+      {
+        "tag": "cyberpunk",
+        "weight": 1.2,
+        "cn": "赛博朋克"
+      },
+      {
+        "tag": "neon lights",
+        "weight": 1.1,
+        "cn": "霓虹灯"
+      },
+      {
+        "tag": "glowing visor",
+        "weight": 1.1,
+        "cn": "发光面罩"
+      },
+      {
+        "tag": "futuristic city night",
+        "weight": 1.2,
+        "cn": "未来城市夜景"
+      },
+      {
+        "tag": "rainy street",
+        "weight": 1,
+        "cn": "雨夜街道"
+      },
+      {
+        "tag": "reflection",
+        "weight": 1,
+        "cn": "倒影"
+      },
+      {
+        "tag": "jacket",
+        "weight": 1,
+        "cn": "夹克"
+      },
+      {
+        "tag": "masterpiece",
+        "weight": 1,
+        "cn": "杰作"
+      },
+      {
+        "tag": "best quality",
+        "weight": 1,
+        "cn": "最佳质量"
+      }
+    ],
+    "negative": [
+      {
+        "tag": "worst quality, low quality",
+        "weight": 1.4,
+        "cn": "低质量"
+      },
+      {
+        "tag": "bad anatomy",
+        "weight": 1.2,
+        "cn": "糟糕的人体"
+      },
+      {
+        "tag": "bad hands",
+        "weight": 1.3,
+        "cn": "糟糕的手"
+      }
+    ]
+  },
+  {
+    "id": "preset_standard_negative",
+    "name": "通用万能负面词 (Universal Negative)",
+    "category": "常用负面",
+    "positive": [],
+    "negative": [
+      {
+        "tag": "worst quality",
+        "weight": 1.4,
+        "cn": "最差质量"
+      },
+      {
+        "tag": "low quality",
+        "weight": 1.4,
+        "cn": "低质量"
+      },
+      {
+        "tag": "bad anatomy",
+        "weight": 1.3,
+        "cn": "糟糕的人体"
+      },
+      {
+        "tag": "bad hands",
+        "weight": 1.3,
+        "cn": "糟糕的手"
+      },
+      {
+        "tag": "missing fingers",
+        "weight": 1.3,
+        "cn": "缺失手指"
+      },
+      {
+        "tag": "extra fingers",
+        "weight": 1.3,
+        "cn": "多余手指"
+      },
+      {
+        "tag": "poorly drawn hands",
+        "weight": 1.2,
+        "cn": "拙劣的手部绘画"
+      },
+      {
+        "tag": "mutated hands",
+        "weight": 1.3,
+        "cn": "变异手部"
+      },
+      {
+        "tag": "ugly",
+        "weight": 1.2,
+        "cn": "丑陋"
+      },
+      {
+        "tag": "blurry",
+        "weight": 1.2,
+        "cn": "模糊"
+      },
+      {
+        "tag": "watermark",
+        "weight": 1.1,
+        "cn": "水印"
+      },
+      {
+        "tag": "signature",
+        "weight": 1.1,
+        "cn": "签名"
+      },
+      {
+        "tag": "text",
+        "weight": 1.1,
+        "cn": "文字"
+      }
+    ]
+  }
+];

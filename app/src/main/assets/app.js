@@ -189,6 +189,15 @@
       .join(', ');
   }
 
+  // Helper: Flexible translation lookup with space/underscore normalization
+  function getTranslation(tag) {
+    if (!tag) return '';
+    const key = tag.trim().toLowerCase();
+    return enToCnMap.get(key) ||
+           enToCnMap.get(key.replace(/\s+/g, '_')) ||
+           enToCnMap.get(key.replace(/_/g, ' ')) || '';
+  }
+
   // Parse raw text into structured tags
   function parseRawPromptText(raw) {
     if (!raw) return [];
@@ -233,8 +242,7 @@
         }
       }
 
-      const lookupKey = cleanTag.toLowerCase();
-      const cn = enToCnMap.get(lookupKey) || '';
+      const cn = getTranslation(cleanTag);
 
       result.push({
         id: 'tag_' + Math.random().toString(36).substr(2, 9),
@@ -280,6 +288,8 @@
       chip.className = 'tag-chip' + (item.disabled ? ' disabled' : '');
 
       const isStarred = state.starredTags.has(item.tag.toLowerCase());
+      const canMoveLeft = index > 0;
+      const canMoveRight = index < tags.length - 1;
 
       chip.innerHTML = `
         <div class="tag-chip-info" title="${item.tag}">
@@ -288,6 +298,8 @@
         </div>
         <span class="chip-weight" title="点击调整权重">${Number(item.weight).toFixed(2).replace(/\.?0+$/, '')}</span>
         <div class="chip-btns">
+          ${canMoveLeft ? `<button class="chip-btn btn-move-left" title="前移">◀</button>` : ''}
+          ${canMoveRight ? `<button class="chip-btn btn-move-right" title="后移">▶</button>` : ''}
           <button class="chip-btn btn-step-dec" title="降权 -0.1">-</button>
           <button class="chip-btn btn-step-inc" title="加权 +0.1">+</button>
           <button class="chip-btn btn-toggle-disable" title="${item.disabled ? '启用' : '禁用'}">${item.disabled ? '👁️‍🗨️' : '👁️'}</button>
@@ -297,6 +309,26 @@
       `;
 
       // Event handlers on chip
+      if (canMoveLeft) {
+        chip.querySelector('.btn-move-left').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tmp = tags[index];
+          tags[index] = tags[index - 1];
+          tags[index - 1] = tmp;
+          renderPrompts();
+        });
+      }
+
+      if (canMoveRight) {
+        chip.querySelector('.btn-move-right').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tmp = tags[index];
+          tags[index] = tags[index + 1];
+          tags[index + 1] = tmp;
+          renderPrompts();
+        });
+      }
+
       chip.querySelector('.btn-step-inc').addEventListener('click', (e) => {
         e.stopPropagation();
         item.weight = Number((item.weight + state.weightStep).toFixed(2));
@@ -348,8 +380,9 @@
     const tags = isPos ? state.positiveTags : state.negativeTags;
     const cleanTag = tag.trim();
 
-    // Check if tag already exists
-    const existing = tags.find(t => t.tag.toLowerCase() === cleanTag.toLowerCase());
+    // Check if tag already exists (space/underscore insensitive)
+    const cleanNorm = cleanTag.toLowerCase().replace(/[\s_]+/g, '_');
+    const existing = tags.find(t => t.tag.toLowerCase().replace(/[\s_]+/g, '_') === cleanNorm);
     if (existing) {
       if (existing.disabled) {
         existing.disabled = false;
@@ -362,7 +395,7 @@
       return;
     }
 
-    const cnFinal = cn || enToCnMap.get(cleanTag.toLowerCase()) || '';
+    const cnFinal = cn || getTranslation(cleanTag);
     tags.push({
       id: 'tag_' + Math.random().toString(36).substr(2, 9),
       tag: cleanTag,
@@ -409,12 +442,17 @@
   }
 
   function performSearch(query) {
-    const qLower = query.toLowerCase();
+    const qLower = query.toLowerCase().trim();
+    if (!qLower) {
+      closeAutocomplete();
+      return;
+    }
     const isSlashAlias = qLower.startsWith('/');
+    const qNorm = qLower.replace(/[\s_]+/g, '_');
 
     const results = [];
     let count = 0;
-    const maxResults = 30;
+    const maxResults = 35;
 
     for (let i = 0; i < dictionaryData.length; i++) {
       const item = dictionaryData[i];
@@ -428,6 +466,7 @@
       const neg = item[6];
 
       const tagLower = tag.toLowerCase();
+      const tagNorm = tagLower.replace(/[\s_]+/g, '_');
       let matched = false;
       let matchAlias = '';
 
@@ -437,14 +476,14 @@
           matchAlias = qLower;
         }
       } else {
-        if (tagLower.startsWith(qLower)) {
+        if (tagNorm.startsWith(qNorm) || tagLower.startsWith(qLower)) {
           matched = true;
         } else if (cn && cn.toLowerCase().includes(qLower)) {
           matched = true;
-        } else if (aliases && aliases.toLowerCase().split(',').some(a => a.trim().startsWith(qLower))) {
+        } else if (aliases && aliases.toLowerCase().split(',').some(a => a.trim().startsWith(qLower) || a.trim().startsWith(qNorm))) {
           matched = true;
           matchAlias = qLower;
-        } else if (tagLower.includes(qLower)) {
+        } else if (tagNorm.includes(qNorm) || tagLower.includes(qLower)) {
           matched = true;
         }
       }
@@ -900,6 +939,12 @@
     searchInput.addEventListener('input', handleSearchInput);
     searchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
+        const topItem = autocompleteList.querySelector('.suggestion-item');
+        if (topItem && autocompleteList.classList.contains('active')) {
+          topItem.click();
+          e.preventDefault();
+          return;
+        }
         const val = searchInput.value.trim();
         if (val) {
           addTag(state.currentFocusPrompt, val, '');
@@ -1065,6 +1110,61 @@
     });
   }
 
+  // --- Robust Data Loader with Quadruple Redundancy ---
+  async function loadDataFile(fileName, globalVarName) {
+    // 1. Script tag preloaded data (instant, 100% offline, zero CORS/file:// limits)
+    if (window[globalVarName] && Array.isArray(window[globalVarName]) && window[globalVarName].length > 0) {
+      return window[globalVarName];
+    }
+
+    // 2. Android native asset reader bridge
+    if (window.AndroidApp && typeof window.AndroidApp.readAsset === 'function') {
+      try {
+        const raw = window.AndroidApp.readAsset('data/' + fileName);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed) return parsed;
+        }
+      } catch (e) {
+        console.warn('AndroidApp.readAsset failed for ' + fileName, e);
+      }
+    }
+
+    // 3. Modern fetch() (works with WebViewAssetLoader https://appassets.androidplatform.net/)
+    try {
+      const resp = await fetch('data/' + fileName);
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (e) {
+      console.warn('fetch() failed for data/' + fileName, e);
+    }
+
+    // 4. Fallback XMLHttpRequest (for older WebViews)
+    return new Promise((resolve, reject) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'data/' + fileName, true);
+        xhr.overrideMimeType('application/json; charset=utf-8');
+        xhr.onload = function() {
+          if (xhr.status === 200 || xhr.status === 0) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch (err) {
+              reject(err);
+            }
+          } else {
+            reject(new Error('XHR status ' + xhr.status));
+          }
+        };
+        xhr.onerror = function(err) { reject(err); };
+        xhr.send();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
   // --- Initialization ---
   async function init() {
     loadPersistedState();
@@ -1074,24 +1174,63 @@
       dictStatusText.textContent = '加载词典数据中...';
 
       const [resCat, resDict, resPresets] = await Promise.all([
-        fetch('data/categories.json').then(r => r.json()),
-        fetch('data/dictionary.json').then(r => r.json()),
-        fetch('data/presets.json').then(r => r.json())
+        loadDataFile('categories.json', 'CATEGORIES_DATA'),
+        loadDataFile('dictionary.json', 'DICTIONARY_DATA'),
+        loadDataFile('presets.json', 'PRESETS_DATA')
       ]);
 
-      categoriesData = resCat;
-      dictionaryData = resDict;
-      presetsData = resPresets;
+      categoriesData = resCat || [];
+      dictionaryData = resDict || [];
+      presetsData = resPresets || [];
 
-      // Build quick lookup maps
-      dictionaryData.forEach(item => {
-        // [tag, cn, type, count, aliases, cat, neg]
-        const tag = item[0].toLowerCase();
-        if (item[1]) enToCnMap.set(tag, item[1]);
-        if (item[5]) enToCatMap.set(tag, item[5]);
-      });
+      // Populate bidirectional lookup maps from categories
+      if (categoriesData && Array.isArray(categoriesData)) {
+        categoriesData.forEach(cat => {
+          if (cat.groups) {
+            cat.groups.forEach(g => {
+              if (g.tags) {
+                g.tags.forEach(t => {
+                  const en = (t.en || '').trim().toLowerCase();
+                  const cn = (t.cn || '').trim();
+                  const catPath = `${cat.name}/${g.name}`;
+                  if (en && cn) {
+                    enToCnMap.set(en, cn);
+                    enToCnMap.set(en.replace(/\s+/g, '_'), cn);
+                    enToCnMap.set(en.replace(/_/g, ' '), cn);
+                    enToCatMap.set(en, catPath);
+                    enToCatMap.set(en.replace(/\s+/g, '_'), catPath);
+                    enToCatMap.set(en.replace(/_/g, ' '), catPath);
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
 
-      dictStatusText.textContent = `已就绪 (${dictionaryData.length.toLocaleString()} 词条 / 11 核心分类)`;
+      // Populate from Danbooru dictionary
+      if (dictionaryData && Array.isArray(dictionaryData)) {
+        dictionaryData.forEach(item => {
+          // [tag, cn, type, count, aliases, cat, neg]
+          const tag = (item[0] || '').toLowerCase();
+          const cn = item[1];
+          const cat = item[5];
+          if (tag) {
+            if (cn) {
+              if (!enToCnMap.has(tag)) enToCnMap.set(tag, cn);
+              if (!enToCnMap.has(tag.replace(/_/g, ' '))) enToCnMap.set(tag.replace(/_/g, ' '), cn);
+              if (!enToCnMap.has(tag.replace(/\s+/g, '_'))) enToCnMap.set(tag.replace(/\s+/g, '_'), cn);
+            }
+            if (cat) {
+              if (!enToCatMap.has(tag)) enToCatMap.set(tag, cat);
+              if (!enToCatMap.has(tag.replace(/_/g, ' '))) enToCatMap.set(tag.replace(/_/g, ' '), cat);
+              if (!enToCatMap.has(tag.replace(/\s+/g, '_'))) enToCatMap.set(tag.replace(/\s+/g, '_'), cat);
+            }
+          }
+        });
+      }
+
+      dictStatusText.textContent = `已就绪 (${dictionaryData.length.toLocaleString()} 词条 / ${categoriesData.length} 核心分类)`;
 
       renderPrompts();
       renderCategoryBrowser();

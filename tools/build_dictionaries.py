@@ -2,15 +2,29 @@ import yaml
 import csv
 import json
 import os
-import re
+import sys
 
-DATA_DIR = r'd:\antigravity workbench\data_prep'
-OUTPUT_DIR = r'd:\antigravity workbench\app_assets'
+# Allows custom arguments or defaults to app assets directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+
+DATA_DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(REPO_ROOT, 'data_prep')
+OUTPUT_DIR = sys.argv[2] if len(sys.argv) > 2 else os.path.join(REPO_ROOT, 'app', 'src', 'main', 'assets', 'data')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # 1. Process zh_CN.yaml
-with open(os.path.join(DATA_DIR, 'zh_CN.yaml'), 'r', encoding='utf-8') as f:
-    zh_categories_raw = yaml.safe_load(f)
+zh_yaml_path = os.path.join(DATA_DIR, 'zh_CN.yaml')
+if os.path.exists(zh_yaml_path):
+    with open(zh_yaml_path, 'r', encoding='utf-8') as f:
+        zh_categories_raw = yaml.safe_load(f)
+else:
+    print(f"Notice: {zh_yaml_path} not found, reading existing categories.json as base if available.")
+    existing_cat = os.path.join(OUTPUT_DIR, 'categories.json')
+    if os.path.exists(existing_cat):
+        with open(existing_cat, 'r', encoding='utf-8') as f:
+            zh_categories_raw = json.load(f)
+    else:
+        zh_categories_raw = []
 
 cat_icons = {
     '人物': '👤',
@@ -49,8 +63,19 @@ for cat in zh_categories_raw:
                 cn_clean = str(cn).strip()
                 tag_list.append({'en': en_clean, 'cn': cn_clean})
                 en_key = en_clean.lower()
-                en_to_cn[en_key] = cn_clean
-                en_to_cat[en_key] = f'{cat_name}/{g_name}'
+                for k in [en_key, en_key.replace(' ', '_'), en_key.replace('_', ' ')]:
+                    en_to_cn[k] = cn_clean
+                    en_to_cat[k] = f'{cat_name}/{g_name}'
+        elif isinstance(tag_dict, list):
+            for item in tag_dict:
+                if isinstance(item, dict):
+                    en_clean = str(item.get('en', '')).strip()
+                    cn_clean = str(item.get('cn', '')).strip()
+                    tag_list.append({'en': en_clean, 'cn': cn_clean})
+                    en_key = en_clean.lower()
+                    for k in [en_key, en_key.replace(' ', '_'), en_key.replace('_', ' ')]:
+                        en_to_cn[k] = cn_clean
+                        en_to_cat[k] = f'{cat_name}/{g_name}'
         cat_obj['groups'].append({
             'name': g_name,
             'color': g_color if g_color else '#4b5563',
@@ -60,115 +85,112 @@ for cat in zh_categories_raw:
 
 print(f"Categories built: {len(categories_data)} categories, {len(en_to_cn)} tag translations.")
 
-# Save categories.json
+# Save categories.json & categories.js
+cat_json_str = json.dumps(categories_data, ensure_ascii=False, separators=(',', ':'))
 with open(os.path.join(OUTPUT_DIR, 'categories.json'), 'w', encoding='utf-8') as f:
-    json.dump(categories_data, f, ensure_ascii=False, separators=(',', ':'))
+    f.write(cat_json_str)
+
+with open(os.path.join(OUTPUT_DIR, 'categories.js'), 'w', encoding='utf-8') as f:
+    f.write(f"window.CATEGORIES_DATA = {cat_json_str};\n")
 
 # 2. Process Danbooru & Autocomplete dictionary
-# We combine:
-# - All tags from zh_CN.yaml (giving them high post count priority if missing in danbooru)
-# - Quality tags
-# - Danbooru tags (up to ~35,000 top tags by post count, plus all matched translations)
-
 danbooru_map = {}
-with open(os.path.join(DATA_DIR, 'danbooru.csv'), 'r', encoding='utf-8') as f:
-    reader = csv.reader(f)
-    for r in reader:
-        if len(r) >= 3:
-            tag_name = r[0].strip()
-            type_code = int(r[1]) if r[1].isdigit() else 0
-            post_count = int(r[2]) if r[2].isdigit() else 0
-            aliases = r[3].strip() if len(r) > 3 else ""
-            danbooru_map[tag_name.lower()] = {
-                'tag': tag_name,
-                'type': type_code,
-                'count': post_count,
-                'aliases': aliases
-            }
-
-# Add extra quality tags
-extra_quality_path = os.path.join(DATA_DIR, 'extra-quality-tags.csv')
-if os.path.exists(extra_quality_path):
-    with open(extra_quality_path, 'r', encoding='utf-8') as f:
+danbooru_csv_path = os.path.join(DATA_DIR, 'danbooru.csv')
+if os.path.exists(danbooru_csv_path):
+    with open(danbooru_csv_path, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
         for r in reader:
-            if r and len(r) >= 2:
-                q_tag = r[0].strip()
-                q_key = q_tag.lower()
-                if q_key not in danbooru_map:
-                    danbooru_map[q_key] = {
-                        'tag': q_tag,
-                        'type': 5,
-                        'count': 5000000,
-                        'aliases': 'quality,best'
-                    }
+            if len(r) >= 3:
+                tag_name = r[0].strip()
+                type_code = int(r[1]) if r[1].isdigit() else 0
+                post_count = int(r[2]) if r[2].isdigit() else 0
+                aliases = r[3].strip() if len(r) > 3 else ""
+                danbooru_map[tag_name.lower()] = {
+                    'tag': tag_name,
+                    'type': type_code,
+                    'count': post_count,
+                    'aliases': aliases
+                }
 
-# Build merged tags dictionary
-merged_tags = {}
+    # Add extra quality tags
+    extra_quality_path = os.path.join(DATA_DIR, 'extra-quality-tags.csv')
+    if os.path.exists(extra_quality_path):
+        with open(extra_quality_path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            for r in reader:
+                if r and len(r) >= 2:
+                    q_tag = r[0].strip()
+                    q_key = q_tag.lower()
+                    if q_key not in danbooru_map:
+                        danbooru_map[q_key] = {
+                            'tag': q_tag,
+                            'type': 5,
+                            'count': 5000000,
+                            'aliases': 'quality,best'
+                        }
 
-# First, insert all tags from zh_CN.yaml
-for cat in categories_data:
-    cat_name = cat['name']
-    is_negative = (cat_name == '反向提示词')
-    for g in cat['groups']:
-        g_name = g['name']
-        for t in g['tags']:
-            en = t['en']
-            cn = t['cn']
-            en_lower = en.lower()
-            dan = danbooru_map.get(en_lower)
-            post_count = dan['count'] if dan else 100000
-            type_code = dan['type'] if dan else (5 if is_negative else 0)
-            aliases = dan['aliases'] if dan else ''
-            merged_tags[en_lower] = {
-                'tag': en,
-                'cn': cn,
-                'type': type_code,
-                'count': post_count,
-                'aliases': aliases,
-                'cat': f"{cat_name}/{g_name}",
-                'neg': 1 if is_negative else 0
+    # Build merged tags dictionary
+    merged_tags = {}
+
+    for cat in categories_data:
+        cat_name = cat['name']
+        is_negative = (cat_name == '反向提示词')
+        for g in cat['groups']:
+            g_name = g['name']
+            for t in g['tags']:
+                en = t['en']
+                cn = t['cn']
+                en_lower = en.lower()
+                dan = danbooru_map.get(en_lower) or danbooru_map.get(en_lower.replace(' ', '_'))
+                post_count = dan['count'] if dan else 100000
+                type_code = dan['type'] if dan else (5 if is_negative else 0)
+                aliases = dan['aliases'] if dan else ''
+                merged_tags[en_lower] = {
+                    'tag': en,
+                    'cn': cn,
+                    'type': type_code,
+                    'count': post_count,
+                    'aliases': aliases,
+                    'cat': f"{cat_name}/{g_name}",
+                    'neg': 1 if is_negative else 0
+                }
+
+    sorted_danbooru = sorted(danbooru_map.values(), key=lambda x: x['count'], reverse=True)
+    for d in sorted_danbooru[:30000]:
+        t_lower = d['tag'].lower()
+        if t_lower not in merged_tags:
+            t_norm_space = t_lower.replace('_', ' ')
+            matched_cn = en_to_cn.get(t_lower) or en_to_cn.get(t_norm_space) or ''
+            matched_cat = en_to_cat.get(t_lower) or en_to_cat.get(t_norm_space) or ''
+            merged_tags[t_lower] = {
+                'tag': d['tag'],
+                'cn': matched_cn,
+                'type': d['type'],
+                'count': d['count'],
+                'aliases': d['aliases'],
+                'cat': matched_cat,
+                'neg': 0
             }
 
-# Next, add Danbooru tags
-# Sort danbooru tags by post_count descending
-sorted_danbooru = sorted(danbooru_map.values(), key=lambda x: x['count'], reverse=True)
+    dict_list = []
+    for k, v in merged_tags.items():
+        dict_list.append([
+            v['tag'],
+            v['cn'],
+            v['type'],
+            v['count'],
+            v['aliases'],
+            v['cat'],
+            v['neg']
+        ])
+    dict_list.sort(key=lambda x: x[3], reverse=True)
 
-# Include top 30,000 Danbooru tags
-for d in sorted_danbooru[:30000]:
-    t_lower = d['tag'].lower()
-    if t_lower not in merged_tags:
-        merged_tags[t_lower] = {
-            'tag': d['tag'],
-            'cn': en_to_cn.get(t_lower, ''),
-            'type': d['type'],
-            'count': d['count'],
-            'aliases': d['aliases'],
-            'cat': en_to_cat.get(t_lower, ''),
-            'neg': 0
-        }
-
-print(f"Total merged dictionary tags: {len(merged_tags)}")
-
-# Convert to compact list of objects for fast client-side searching
-# [tag, cn, type, count, aliases, cat, neg]
-dict_list = []
-for k, v in merged_tags.items():
-    dict_list.append([
-        v['tag'],
-        v['cn'],
-        v['type'],
-        v['count'],
-        v['aliases'],
-        v['cat'],
-        v['neg']
-    ])
-
-# Sort list by count descending
-dict_list.sort(key=lambda x: x[3], reverse=True)
-
-with open(os.path.join(OUTPUT_DIR, 'dictionary.json'), 'w', encoding='utf-8') as f:
-    json.dump(dict_list, f, ensure_ascii=False, separators=(',', ':'))
+    dict_json_str = json.dumps(dict_list, ensure_ascii=False, separators=(',', ':'))
+    with open(os.path.join(OUTPUT_DIR, 'dictionary.json'), 'w', encoding='utf-8') as f:
+        f.write(dict_json_str)
+    with open(os.path.join(OUTPUT_DIR, 'dictionary.js'), 'w', encoding='utf-8') as f:
+        f.write(f"window.DICTIONARY_DATA = {dict_json_str};\n")
+    print(f"Total merged dictionary tags: {len(dict_list)}")
 
 # Generate default Presets for quick start
 presets_data = [
@@ -246,7 +268,11 @@ presets_data = [
     }
 ]
 
+presets_json_str = json.dumps(presets_data, ensure_ascii=False, indent=2)
 with open(os.path.join(OUTPUT_DIR, 'presets.json'), 'w', encoding='utf-8') as f:
-    json.dump(presets_data, f, ensure_ascii=False, indent=2)
+    f.write(presets_json_str)
 
-print("Presets generated successfully.")
+with open(os.path.join(OUTPUT_DIR, 'presets.js'), 'w', encoding='utf-8') as f:
+    f.write(f"window.PRESETS_DATA = {presets_json_str};\n")
+
+print("Presets and all data assets generated successfully.")
