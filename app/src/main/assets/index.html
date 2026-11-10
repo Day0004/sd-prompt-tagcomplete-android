@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SD 提示词助手 (Prompt Master)</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">✨</div>
+      <div class="brand-text">
+        <h1>SD 提示词助手</h1>
+        <span id="dict-status-text">词典加载中...</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" id="btn-quick-negative" title="插入通用负面词">🛡️</button>
+      <button class="btn-icon" id="btn-clear-all" title="清空全部提示词">🧹</button>
+    </div>
+  </header>
+
+  <!-- TagComplete Autocomplete Search Bar -->
+  <section class="search-container">
+    <div class="search-box">
+      <span style="font-size:16px;">🔍</span>
+      <input type="text" id="tag-search-input" placeholder="输入英文标签、中文翻译、缩写 (如: 1girl, 长发, /lh)..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <span class="search-clear" id="search-clear-btn" style="display:none;">✕</span>
+    </div>
+
+    <!-- Floating Autocomplete Suggestions Dropdown -->
+    <div class="autocomplete-dropdown" id="autocomplete-list"></div>
+  </section>
+
+  <!-- Main Views Container -->
+  <main class="tab-content">
+
+    <!-- PAGE 1: 工作台 (Editor) -->
+    <div class="page active" id="page-editor">
+
+      <!-- Positive Prompt Card -->
+      <div class="prompt-card">
+        <div class="prompt-card-header">
+          <div class="prompt-title pos">
+            <span>✨ 正向提示词 (Positive)</span>
+            <span class="tag-counter" id="pos-count-badge">0 词</span>
+          </div>
+          <div class="card-actions">
+            <button class="btn-sm btn-copy-pos" id="btn-copy-pos">📋 复制</button>
+            <button class="btn-sm" id="btn-toggle-pos-mode">📝 纯文本</button>
+            <button class="btn-sm" id="btn-clear-pos">清空</button>
+          </div>
+        </div>
+        <!-- Chips container -->
+        <div class="chips-container" id="pos-chips-box">
+          <div class="empty-tip">点击下方分类或使用搜索栏添加提示词</div>
+        </div>
+        <!-- Raw Textarea mode -->
+        <textarea class="raw-textarea" id="pos-raw-text" placeholder="直接编辑正向提示词，英文逗号分隔..."></textarea>
+      </div>
+
+      <!-- Negative Prompt Card -->
+      <div class="prompt-card">
+        <div class="prompt-card-header">
+          <div class="prompt-title neg">
+            <span>🚫 负向提示词 (Negative)</span>
+            <span class="tag-counter" id="neg-count-badge">0 词</span>
+          </div>
+          <div class="card-actions">
+            <button class="btn-sm btn-copy-neg" id="btn-copy-neg">📋 复制</button>
+            <button class="btn-sm" id="btn-toggle-neg-mode">📝 纯文本</button>
+            <button class="btn-sm" id="btn-clear-neg">清空</button>
+          </div>
+        </div>
+        <!-- Chips container -->
+        <div class="chips-container" id="neg-chips-box">
+          <div class="empty-tip">未添加反向提示词 (可点击右上角 🛡️ 一键填入通用负面)</div>
+        </div>
+        <!-- Raw Textarea mode -->
+        <textarea class="raw-textarea" id="neg-raw-text" placeholder="直接编辑反向提示词，英文逗号分隔..."></textarea>
+      </div>
+
+      <!-- Combined Actions Bar -->
+      <div class="combined-bar">
+        <button class="btn-primary" id="btn-copy-all">
+          <span>📋 一键复制全部 (正向+负向)</span>
+        </button>
+        <button class="btn-secondary" id="btn-save-as-preset">
+          <span>⭐ 存为预设</span>
+        </button>
+      </div>
+
+      <!-- Quick Weight Batch Adjustment & Formatting -->
+      <div class="prompt-card" style="margin-bottom:20px;">
+        <div class="prompt-card-header">
+          <span style="font-size:13px; font-weight:600; color:var(--text-muted);">⚡ 快捷工具</span>
+        </div>
+        <div style="padding:10px 12px; display:flex; flex-wrap:wrap; gap:8px;">
+          <button class="btn-sm" id="btn-format-all">🔄 整理去重与格式化</button>
+          <button class="btn-sm" id="btn-batch-inc-pos">正向权重 +0.1</button>
+          <button class="btn-sm" id="btn-batch-dec-pos">正向权重 -0.1</button>
+          <button class="btn-sm" id="btn-reset-weights">重置全部权重为 1.0</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PAGE 2: 分类库 (Categories - Prompt All in One) -->
+    <div class="page" id="page-categories">
+      <div class="category-view">
+        <!-- Horizontal Category Pills -->
+        <div class="category-nav" id="category-tabs"></div>
+        <!-- Subgroup & Tags list -->
+        <div class="groups-container" id="category-groups"></div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: 词典联想 (TagComplete Danbooru Explorer) -->
+    <div class="page" id="page-dictionary">
+      <div style="margin-bottom:10px;">
+        <div style="font-size:15px; font-weight:700; margin-bottom:4px;">📚 Danbooru 词典数据库</div>
+        <div style="font-size:12px; color:var(--text-dim);">收录 31,000+ 高频标签，按发帖热度排序与中文对应</div>
+      </div>
+      <!-- Type Filter Pills -->
+      <div class="dict-toolbar" id="dict-type-filters">
+        <button class="dict-filter-btn active" data-type="all">全部</button>
+        <button class="dict-filter-btn" data-type="0">普通 (General)</button>
+        <button class="dict-filter-btn" data-type="4">角色 (Character)</button>
+        <button class="dict-filter-btn" data-type="1">画师 (Artist)</button>
+        <button class="dict-filter-btn" data-type="3">作品 (Series)</button>
+        <button class="dict-filter-btn" data-type="5">画质/元数据 (Meta)</button>
+      </div>
+      <!-- Tag List -->
+      <div class="dict-list" id="dict-results-container"></div>
+    </div>
+
+    <!-- PAGE 4: 收藏与预设 (Favorites & Presets) -->
+    <div class="page" id="page-favorites">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div>
+          <div style="font-size:16px; font-weight:700;">⭐ 收藏与预设模板</div>
+          <div style="font-size:12px; color:var(--text-dim);">一键应用常用提示词组合与收藏标签</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-sm" id="btn-export-presets">📤 导出</button>
+          <button class="btn-sm" id="btn-import-presets">📥 导入</button>
+        </div>
+      </div>
+
+      <!-- Presets Subtitle -->
+      <div style="font-size:13px; font-weight:700; color:#818cf8; margin-bottom:8px;">🎨 提示词预设组合</div>
+      <div id="presets-container"></div>
+
+      <!-- Starred Tags Subtitle -->
+      <div style="font-size:13px; font-weight:700; color:#f472b6; margin:16px 0 8px 0;">⭐ 收藏的单个标签</div>
+      <div id="starred-tags-container" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+
+    <!-- PAGE 5: 设置与关于 (Settings) -->
+    <div class="page" id="page-settings">
+      <div style="font-size:16px; font-weight:700; margin-bottom:16px;">⚙️ 应用设置与说明</div>
+
+      <div class="prompt-card" style="padding:14px; margin-bottom:12px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:6px;">💡 提示词权重格式</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">控制导出的权重语法格式</div>
+        <div style="display:flex; gap:10px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+            <input type="radio" name="weight-format" value="colon" checked>
+            <span>(tag:1.2) WebUI 标准</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+            <input type="radio" name="weight-format" value="bracket">
+            <span>{tag} / [tag] 括号叠加</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="prompt-card" style="padding:14px; margin-bottom:12px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:6px;">⚙️ 权重微调步长</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">每次点击 +/- 调整的权重增减量</div>
+        <div style="display:flex; gap:10px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+            <input type="radio" name="weight-step" value="0.05">
+            <span>0.05 (精细)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+            <input type="radio" name="weight-step" value="0.1" checked>
+            <span>0.1 (标准)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="prompt-card" style="padding:14px; margin-bottom:16px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:8px;">📖 项目与词典来源</div>
+        <div style="font-size:13px; color:var(--text-muted); line-height:1.6;">
+          本应用基于以下两个优秀开源项目核心思想与内置词典开发：<br>
+          • <b>sd-webui-prompt-all-in-one</b> (分类提示词库、多语言对照、权重微调、可视化标签管理)<br>
+          • <b>a1111-sd-webui-tagcomplete</b> (Danbooru 高频标签词典、实时输入联想补全、热度统计、别名缩写匹配)<br>
+          <br>
+          专为移动端独立运行优化：去掉了冗余的本地 LoRA/底模检测和复杂的在线翻译 API，词典 100% 离线内置，轻巧极速。
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Navigation Tab Bar -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" data-tab="editor">
+      <div class="nav-icon">✍️</div>
+      <span>工作台</span>
+    </div>
+    <div class="nav-item" data-tab="categories">
+      <div class="nav-icon">🏷️</div>
+      <span>分类库</span>
+    </div>
+    <div class="nav-item" data-tab="dictionary">
+      <div class="nav-icon">🔍</div>
+      <span>词典</span>
+    </div>
+    <div class="nav-item" data-tab="favorites">
+      <div class="nav-icon">⭐</div>
+      <span>收藏预设</span>
+    </div>
+    <div class="nav-item" data-tab="settings">
+      <div class="nav-icon">⚙️</div>
+      <span>设置</span>
+    </div>
+  </nav>
+
+  <!-- Modal for Saving Presets -->
+  <div class="modal-overlay" id="preset-modal">
+    <div class="modal-card">
+      <div class="modal-title">⭐ 保存为提示词预设</div>
+      <div class="modal-body">
+        <input type="text" id="preset-title-input" placeholder="预设名称 (例如: 赛博朋克唯美插画)">
+        <input type="text" id="preset-cat-input" placeholder="分类标签 (例如: 我的模板)">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-sm" id="btn-preset-cancel">取消</button>
+        <button class="btn-sm btn-primary" id="btn-preset-confirm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Message Element -->
+  <div class="toast-msg" id="toast">已复制到剪贴板</div>
+
+  <script src="app.js"></script>
+</body>
+</html>
